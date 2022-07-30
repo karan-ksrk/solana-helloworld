@@ -14,8 +14,9 @@ import {
 import fs from 'mz/fs';
 import path from 'path';
 import * as borsh from 'borsh';
-
-import {getPayer, getRpcUrl, createKeypairFromFile} from './utils';
+import * as BufferLayout from '@solana/buffer-layout';
+import { Buffer } from 'buffer';
+import { getPayer, getRpcUrl, createKeypairFromFile } from './utils';
 
 /**
  * Connection to the network
@@ -61,7 +62,7 @@ const PROGRAM_KEYPAIR_PATH = path.join(PROGRAM_PATH, 'helloworld-keypair.json');
  */
 class GreetingAccount {
   counter = 0;
-  constructor(fields: {counter: number} | undefined = undefined) {
+  constructor(fields: { counter: number } | undefined = undefined) {
     if (fields) {
       this.counter = fields.counter;
     }
@@ -72,7 +73,7 @@ class GreetingAccount {
  * Borsh schema definition for greeting accounts
  */
 const GreetingSchema = new Map([
-  [GreetingAccount, {kind: 'struct', fields: [['counter', 'u32']]}],
+  [GreetingAccount, { kind: 'struct', fields: [['counter', 'u32']] }],
 ]);
 
 /**
@@ -99,7 +100,7 @@ export async function establishConnection(): Promise<void> {
 export async function establishPayer(): Promise<void> {
   let fees = 0;
   if (!payer) {
-    const {feeCalculator} = await connection.getRecentBlockhash();
+    const { feeCalculator } = await connection.getRecentBlockhash();
 
     // Calculate the cost to fund the greeter account
     fees += await connection.getMinimumBalanceForRentExemption(GREETING_SIZE);
@@ -195,15 +196,39 @@ export async function checkProgram(): Promise<void> {
   }
 }
 
+function createIncrementInstruction(): Buffer {
+  const layout = BufferLayout.struct([BufferLayout.u8('instruction')]);
+  const data = Buffer.alloc(layout.span);
+  layout.encode({ instruction: 0 }, data);
+  return data;
+}
+
+function createDecrementInstruction(): Buffer {
+  const layout = BufferLayout.struct([BufferLayout.u8('instruction')]);
+  const data = Buffer.alloc(layout.span);
+  layout.encode({ instruction: 1 }, data);
+  return data;
+}
+
+function createSetInstruction(): Buffer {
+  const layout = BufferLayout.struct([
+    BufferLayout.u8('instruction'),
+    BufferLayout.u32('value')
+  ]);
+  const data = Buffer.alloc(layout.span);
+  layout.encode({ instruction: 2, value: 100 }, data);
+  return data;
+}
+
 /**
  * Say hello
  */
 export async function sayHello(): Promise<void> {
   console.log('Saying hello to', greetedPubkey.toBase58());
   const instruction = new TransactionInstruction({
-    keys: [{pubkey: greetedPubkey, isSigner: false, isWritable: true}],
+    keys: [{ pubkey: greetedPubkey, isSigner: false, isWritable: true }],
     programId,
-    data: Buffer.alloc(0), // All instructions are hellos
+    data: createSetInstruction(), // All instructions are hellos
   });
   await sendAndConfirmTransaction(
     connection,
