@@ -28,7 +28,9 @@ pub fn process_instruction(
     instruction_data: &[u8], // Ignored, all helloworld instructions are hellos
 ) -> ProgramResult {
     msg!("Hello World Rust program entrypoint");
+    msg!("Instruction data: {:?}", instruction_data);
     let instruction = HelloInstruction::unpack(instruction_data)?;
+    msg!("Instruction: {:?}", instruction);
 
     // Iterating accounts is safer than indexing
     let accounts_iter = &mut accounts.iter();
@@ -39,7 +41,8 @@ pub fn process_instruction(
     // The account must be owned by the program in order to modify its data
     if account.owner != program_id {
         msg!("Greeted account does not have the correct program id");
-        return Err(ProgramError::IncorrectProgramId);
+        return Err(ProgramError::IncorrectProgramId
+        );
     }
 
     // Increment and store the number of times the account has been greeted
@@ -80,7 +83,17 @@ mod test {
             false,
             Epoch::default(),
         );
-        let instruction_data: Vec<u8> = Vec::new();
+        // let instruction_data: Vec<u8> = Vec::new();
+        // 0 - increment
+        // 1 - decrement
+        // 2 - set
+        //     1-4 -> u32 le
+        // [0/1/2, 100, 0, 0, 0]
+        let arr = u32::to_le_bytes(100);
+        let mut instruction_data = [2; 5];
+        for i in 0..4 {
+            instruction_data[i + 1] = arr[i];
+        }
 
         let accounts = vec![account];
 
@@ -95,14 +108,15 @@ mod test {
             GreetingAccount::try_from_slice(&accounts[0].data.borrow())
                 .unwrap()
                 .counter,
-            1
+            100
         );
+        let mut instruction_data = [0; 5];
         process_instruction(&program_id, &accounts, &instruction_data).unwrap();
         assert_eq!(
             GreetingAccount::try_from_slice(&accounts[0].data.borrow())
                 .unwrap()
                 .counter,
-            2
+            101
         );
     }
 }
